@@ -1,71 +1,62 @@
-from flask import Flask, request, jsonify
-from google import genai
-import random
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
+from flask import Flask, request, jsonify, render_template
+from generate import generate_bug, evaluate_fix
 app = Flask(__name__)
 
-client_ai = genai.Client(api_key=GEMINI_API_KEY)
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-def generate_bug(language, difficulty):
-    topics = ["loops", "list comprehension", "dictionaries", "math operations", "string manipulation", "file handling", "functions", "classes and objects"]
-    selected_topic = random.choice(topics)
 
-    prompt = f"""
-    You are a programming instructor.
-    Generate a unique {language} code snippet on {selected_topic} and include a bug, syntax error or a logical error.
-    The user will have to identify and fix the bug. Do NOT provide the solution or generate code without an error.
-    Dont mention the bug in the code comments.
+@app.route("/generate-bug", methods=["POST"])
+def generate_bug_api():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
 
-    Difficulty: {difficulty}
+    language = data.get("language", "Python")
+    difficulty = data.get("difficulty", "Easy")
 
-    Return EXACTLY in this format:
-    BUGGY_CODE:
-    """
+    try:
+        code = generate_bug(language, difficulty)
+        return jsonify({
+            "status": "success",
+            "buggy_code": code
+        })
+    except Exception as e:
+        print("Error during bug generation:", str(e))
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
-    response = client_ai.models.generate_content(
-        model="gemini-2.5-flash-lite",
-        contents=prompt,
-        config={
-            'temperature': 0.8,
-        }
-    )
 
-    return response.text
+@app.route("/evaluate-fix", methods=["POST"])
+def evaluate_fix_api():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
 
-def evaluate_fix(buggy_code, user_code):
-    prompt = f"""
-    You are an expert programmer.
+    buggy_code = data.get("buggy_code")
+    user_code = data.get("user_code")
 
-    BUGGY CODE:
-    {buggy_code}
+    if not buggy_code or not user_code:
+        return jsonify({
+            "status": "error",
+            "message": "Buggy code and user code are required."
+        }), 400
 
-    USER FIX:
-    {user_code}
+    try:
+        feedback = evaluate_fix(buggy_code, user_code)
+        return jsonify({
+            "status": "success",
+            "feedback": feedback
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
-    Answer clearly:
-    Is the fix correct?
-    What was the bug?
-    Why does it occur?
-    Best practice solution
 
-    Talk as if you are talking to the user who submitted the fix but dont introduce or say hi, just begin answering.
-    """
-
-    response = client_ai.models.generate_content(
-        model="gemini-2.5-flash-lite",
-        contents=prompt
-    )
-
-    return response.text
-
-Buggy_code = generate_bug("Python", "Easy")
-Buggy_code_clean = Buggy_code.replace("BUGGY_CODE:", "").strip()
-print(Buggy_code_clean)
-fixed_code = input("Enter your fixed code:\n")
-print(evaluate_fix(Buggy_code_clean, fixed_code))
+if __name__ == "__main__":
+    app.run(debug=True)
