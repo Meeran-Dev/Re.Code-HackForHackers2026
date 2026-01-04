@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 from generate import generate_bug, evaluate_fix
+import os
+
 app = Flask(__name__)
 
 @app.route("/")
@@ -59,4 +61,5 @@ def evaluate_fix_api():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

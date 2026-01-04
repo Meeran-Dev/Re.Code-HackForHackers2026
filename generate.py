@@ -31,11 +31,7 @@ def generate_bug(language, difficulty):
     if not response or not response.text:
         raise ValueError("Error during code generation.")
     
-    try:
-        return response.text.strip()
-    except Exception:
-        return response.candidates[0].content.parts[0].text.strip()
-    # return response.text.replace("BUGGY_CODE:", "").strip()
+    return response.text.strip()
 
 def evaluate_fix(buggy_code, user_code):
     prompt = f"""
